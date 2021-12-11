@@ -1,0 +1,12 @@
+users/post/<int>/<text>
+users\/post\/\<int\>\/\<text\>
+users\/post\/\<int\>\/\<text\>
+users/post/<int>/<text>
+users\/post\/\<int\>\/\<text\>
+users\/post\/\<int\>\/\<text\>
+users/post/<int>/<text>
+users\/post\/\<int\>\/\<text\>
+users\/post\/\<int\>\/\<text\>
+users/post/[0-9]*/.*
+users/post/[0-9]*/.*
+users/post/[0-9]*/.*
