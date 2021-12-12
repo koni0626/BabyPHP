@@ -2,91 +2,139 @@
 require("pages/user/user.php");
 
 
-
+/**
+ * 送信元のクエリー(URL)とルーティングのURLを正規表現で比較する。
+ * @param string $queryString　
+ * @param string $routerPath <int>,<str>を含むルーティングのパス
+ * @return $srcUrlと$routerPathが一致する場合1, 異なる場合0を返す
+ */
 function isMatchUrl($srcUrl, $routerPath) {
-
     $routerPath = str_replace("<int>", "[0-9]*", $routerPath);
     $routerPath = str_replace("<str>", ".*", $routerPath);
     $routerPath = str_replace("/", "\/", $routerPath);
     $routerPath = "/^".$routerPath."$/";
 
-    $ret = preg_match($routerPath, $srcUrl);
-    
-    return $ret;
+    return preg_match($routerPath, $srcUrl);
+
 
 }
 
-function getMethodParams($path, $url) {
-    if(!$path) {
-        return null;
-    }
-    if(!$url) {
-        return null;
-    }
-    
-    //$routerMapに指定したpathを分解する
-    $pathTokens = preg_split("/[/]/", $path);
-    //ネームスペースを取得
-    $pathNameSpace = $pathTokens[0];
-    //関数を取得
-    $pathMethod = $pathTokens[1];
-    //引数を取得
-    $pathParams = array_slice($pathTokens, 2);
-
+/**
+ * 送信元URLを分解し、パラメーターを取得する。
+ * URLは以下の形式とし、param1以降を分解して取得する
+ * /page/action/param1/param2/…
+ * @param string $queryString URL
+ * @return パラメーターを先頭から配列形式で返却する
+ */
+function getUrlParams($queryString) {
+    $urlParams = null;
     //URLを分解する
-    $urlTokens = preg_split("/[/]/", $url);
-    $urlNameSpace = $urlTokens[0];
-    $urlMethod = $urlTokens[1];
-    $urlParams = array_slice($urlTokens, 2);
-
-    if(count($pathParams) != count($urlParams)) {
-        //パラメーターの数が異なる
-        return null;
+    $urlTokens =explode("/", $queryString);
+    $tokenNum = count($urlTokens);
+     if($tokenNum > 2) {
+        $urlParams = array_slice($urlTokens, 2);
     }
 
-    for($i = 0; $i < count($pathParams); $i++) {
-        switch($pathParams[$i]) {
-            case "<int>":
-                if(!is_numeric($urlParams[$i])) {
-                    return null;
-                }
-                break;
-            default:
-                break;
-        }
-    }
-    //OKなパラメーターだった場合。
     return $urlParams;
 }
 
-function main() {
-//URLのパスと呼び出す関数を設定する
+/**
+ * メソッド名を大文字、小文字を区別せずに比較する
+ * @param string $srcMethod 比較元メソッド名
+ * @param string $dstMethod 比較先メソッド名
+ * @return 一致する場合True、異なる場合False
+ */
+function isMatchMethod($srcMethod, $dstMethod) {
+    $ret = false;
+    if(!$srcMethod) {
+        return false;
+    }
+
+    if(!$dstMethod) {
+        return false;
+    }
+
+    if(strcasecmp($srcMethod, $dstMethod) == 0) {
+        $ret = true;
+    }
+
+    return $ret;
+}
+
+
+/**
+ * フレームワークのエントリポイント。
+ * アクセスされたURLを各処理に振り分ける。
+ */
+function routerMain() {
+    $db = null;
+    $requestMethod = "";
+    $queryString = "/";
+    //URLのパスと呼び出す関数を設定する
     $routerMap = [
         ["path"=>"/", "func"=>'user\index', "auth"=>false, "method"=>"GET"],
-        ["path"=>"users", "func"=>'user\index', "auth"=>false, "method"=>"POST"],
+        ["path"=>"users", "func"=>'user\index', "auth"=>false, "method"=>"GET"],
         ["path"=>"users/post/<int>/<str>", "func"=>'user\post', "auth"=>false, "method"=>"POST"],
     ];
 
-    $url = "/";
-    if(array_key_exists('url', $_GET)) {
-        $url = $_GET['url'];
+    //メソッドの種別を取得する
+    if(isset($_SERVER["REQUEST_METHOD"])) {
+        $requestMethod = $_SERVER["REQUEST_METHOD"];
     }
-    print_r($_GET);
-    print_r($_POST);
+    else {
+        //パラメーター不正
+        return;
+    }
+    print_r($_SERVER["QUERY_STRING"]);
+    //クエリーを取得する
+    if(isset($_SERVER["QUERY_STRING"])) {
+        $queryString = explode("=", $_SERVER["QUERY_STRING"])[1];
+    }
+    else {
+        //パラメーター不正
+        return;
+    }
+    
+    //データベースの接続
+    $db= new mysqli("localhost", "root", "", "testdb");
+    if($db->connect_error) {
+        print("接続エラー");
+        return;
+    }
+    else {
+        $db->set_charset('utf8');
+    }
 
 
+
+   // print_r($_GET);
+   // print_r($_POST);
+   // print_r($_SERVER);
+
+    //クエリーから呼び出す関数を検索する
     foreach($routerMap as $map) {
         $path = $map["path"];
-        $func = $map["func"];
+        $callBack = $map["func"];
         $isAuth = $map["auth"];
-
-        if(isMatchUrl($url, $path)==1) {
-            print($url."と".$path."がマッチしました\n");
-            //$func();
+        $method = $map["method"];
+        //print($queryString."と".$path."の比較<br>");
+        if(isMatchUrl($queryString, $path) && isMatchMethod($requestMethod, $method)) {
+            //print($queryString."と".$path."がマッチしました<br>");
+            $params = [$db];
+            $params[] = getUrlParams($queryString);
+            //関数呼び出し
+            call_user_func_array($callBack, $params);
+            
+            break;
         }
+    }
+
+    if($db) {
+        $db->close();
     }
 }
 
-main();
+//エントリポイントの起動
+routerMain();
 
 ?>
