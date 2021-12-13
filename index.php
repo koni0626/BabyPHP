@@ -61,6 +61,13 @@ function isMatchMethod($srcMethod, $dstMethod) {
     return $ret;
 }
 
+function defaultAuth($db, $session) {
+
+}
+
+function middleWare($db, $queryString) {
+
+}
 
 /**
  * フレームワークのエントリポイント。
@@ -72,8 +79,7 @@ function routerMain() {
     $queryString = "/";
     //URLのパスと呼び出す関数を設定する
     $routerMap = [
-        ["path"=>"/", "func"=>'user\index', "auth"=>false, "method"=>"GET"],
-        ["path"=>"users", "func"=>'user\index', "auth"=>false, "method"=>"GET"],
+        ["path"=>"users", "func"=>'user\get', "auth"=>false, "method"=>"GET"],
         ["path"=>"users/post/<int>/<str>", "func"=>'user\post', "auth"=>false, "method"=>"POST"],
     ];
 
@@ -88,7 +94,10 @@ function routerMain() {
     print_r($_SERVER["QUERY_STRING"]);
     //クエリーを取得する
     if(isset($_SERVER["QUERY_STRING"])) {
-        $queryString = explode("=", $_SERVER["QUERY_STRING"])[1];
+        $tokens = explode("=", $_SERVER["QUERY_STRING"]);
+        if(count($tokens) == 2) {
+            $queryString = $tokens[1];
+        }
     }
     else {
         //パラメーター不正
@@ -119,7 +128,15 @@ function routerMain() {
         $method = $map["method"];
         //print($queryString."と".$path."の比較<br>");
         if(isMatchUrl($queryString, $path) && isMatchMethod($requestMethod, $method)) {
-            //print($queryString."と".$path."がマッチしました<br>");
+          
+            //TODO 認証処理を追加する
+            if(!defaultAuth($db, null)) {
+                //認証エラー
+            }
+            
+            //ここでミドルウェアを実装する。
+             middleWare($db, $queryString);
+
             $params = [$db];
             $params[] = getUrlParams($queryString);
             //関数呼び出し
